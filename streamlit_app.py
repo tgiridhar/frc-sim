@@ -1,151 +1,111 @@
+import random
 import streamlit as st
-import pandas as pd
-import math
-from pathlib import Path
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
-
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
-
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
-
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
+def simulate_match(params):
     """
+    Simulates a match of REEFSCAPE second-by-second based on input parameters.
+    :param params: A dictionary containing success probabilities and scoring opportunities for tasks.
+    :return: A timeline of actions for each alliance and their scores.
+    """
+    def attempt_task(success_prob):
+        """Simulates a single task attempt based on success probability."""
+        return random.random() < success_prob
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+    timeline = []
+    red_alliance = {"score": 0, "actions": [[], [], []]}  # Actions for 3 robots
+    blue_alliance = {"score": 0, "actions": [[], [], []]}  # Actions for 3 robots
+    net_fill_red = 0
+    net_fill_blue = 0
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+    # Simulate the match second by second
+    for second in range(1, 151):  # 2:30 minutes = 150 seconds
+        red_robot_actions = ["", "", ""]
+        blue_robot_actions = ["", "", ""]
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
+        # Red Alliance actions
+        for robot_idx in range(3):
+            if second <= 15:  # Autonomous period
+                if attempt_task(params['red']['auto_leave_prob']):
+                    red_robot_actions[robot_idx] = "Leaves start line"
+                    red_alliance['score'] += 3
+                if attempt_task(params['red']['auto_coral_l1_prob']):
+                    red_robot_actions[robot_idx] = "Scores coral on L1"
+                    red_alliance['score'] += 3
+                if attempt_task(params['red']['auto_algae_processor_prob']):
+                    red_robot_actions[robot_idx] = "Drops algae in processor"
+                    red_alliance['score'] += 6
+            else:  # Teleop period
+                if second % 5 == 0 and attempt_task(params['red']['teleop_algae_processor_prob']):
+                    red_robot_actions[robot_idx] = "Drops algae in processor"
+                    red_alliance['score'] += 6
+                elif second % 7 == 0 and attempt_task(max(0.1, params['red']['teleop_algae_net_prob'] - 0.05 * net_fill_red)):
+                    red_robot_actions[robot_idx] = "Shoots algae into net"
+                    red_alliance['score'] += 4
+                    net_fill_red += 1
+                elif second % 10 == 0 and attempt_task(params['red']['teleop_coral_l3_prob']):
+                    red_robot_actions[robot_idx] = "Scores coral on L3"
+                    red_alliance['score'] += 4
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+        # Blue Alliance actions
+        for robot_idx in range(3):
+            if second <= 15:  # Autonomous period
+                if attempt_task(params['blue']['auto_leave_prob']):
+                    blue_robot_actions[robot_idx] = "Leaves start line"
+                    blue_alliance['score'] += 3
+                if attempt_task(params['blue']['auto_coral_l1_prob']):
+                    blue_robot_actions[robot_idx] = "Scores coral on L1"
+                    blue_alliance['score'] += 3
+                if attempt_task(params['blue']['auto_algae_processor_prob']):
+                    blue_robot_actions[robot_idx] = "Drops algae in processor"
+                    blue_alliance['score'] += 6
+            else:  # Teleop period
+                if second % 5 == 0 and attempt_task(params['blue']['teleop_algae_processor_prob']):
+                    blue_robot_actions[robot_idx] = "Drops algae in processor"
+                    blue_alliance['score'] += 6
+                elif second % 7 == 0 and attempt_task(max(0.1, params['blue']['teleop_algae_net_prob'] - 0.05 * net_fill_blue)):
+                    blue_robot_actions[robot_idx] = "Shoots algae into net"
+                    blue_alliance['score'] += 4
+                    net_fill_blue += 1
+                elif second % 10 == 0 and attempt_task(params['blue']['teleop_coral_l3_prob']):
+                    blue_robot_actions[robot_idx] = "Scores coral on L3"
+                    blue_alliance['score'] += 4
 
-    return gdp_df
+        # Record timeline
+        timeline.append({
+            "second": second,
+            "red_actions": red_robot_actions,
+            "blue_actions": blue_robot_actions,
+            "red_score": red_alliance['score'],
+            "blue_score": blue_alliance['score']
+        })
 
-gdp_df = get_gdp_data()
+    return timeline
 
-# -----------------------------------------------------------------------------
-# Draw the actual page
+# Streamlit UI
+st.title("REEFSCAPE Second-by-Second Match Simulator")
 
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
+st.sidebar.header("Adjust Probabilities")
+def get_params(alliance_name):
+    return {
+        "auto_leave_prob": st.sidebar.slider(f"{alliance_name} Auto Leave Probability", 0.0, 1.0, 1.0),
+        "auto_coral_l1_prob": st.sidebar.slider(f"{alliance_name} Auto Coral L1 Probability", 0.0, 1.0, 0.9),
+        "auto_algae_processor_prob": st.sidebar.slider(f"{alliance_name} Auto Algae Processor Probability", 0.0, 1.0, 0.8),
 
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
+        "teleop_algae_processor_prob": st.sidebar.slider(f"{alliance_name} Teleop Algae Processor Probability", 0.0, 1.0, 0.8),
+        "teleop_algae_net_prob": st.sidebar.slider(f"{alliance_name} Teleop Algae Net Probability", 0.0, 1.0, 0.4),
+        "teleop_coral_l3_prob": st.sidebar.slider(f"{alliance_name} Teleop Coral L3 Probability", 0.0, 1.0, 0.5),
+    }
 
-# Add some spacing
-''
-''
+parameters = {
+    "red": get_params("Red Alliance"),
+    "blue": get_params("Blue Alliance")
+}
 
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
+if st.button("Simulate Match"):
+    timeline = simulate_match(parameters)
+    st.subheader("Match Timeline")
 
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+    for event in timeline:
+        st.write(f"Second {event['second']}:\n"
+                 f"  Red Alliance: {[action for action in event['red_actions'] if action]} (Score: {event['red_score']})\n"
+                 f"  Blue Alliance: {[action for action in event['blue_actions'] if action]} (Score: {event['blue_score']})")
