@@ -3,6 +3,8 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import time
+from matplotlib.animation import FuncAnimation
 
 def simulate_match(params):
     """
@@ -122,32 +124,57 @@ def simulate_match(params):
 
     return timeline
 
-def plot_arena(timeline, current_second):
-    """Plots the arena with robot actions and locations."""
-    event = timeline[current_second - 1]  # Get the event for the current second
-
+def animate_arena(timeline):
+    """Animates the arena showing robot actions, coral, processor, and barge areas over time."""
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 10)
-    ax.set_title(f"Arena at Second {current_second}")
+    ax.set_title("Arena Animation with Coral, Processor, and Barge")
     ax.set_xlabel("X-axis (field width)")
     ax.set_ylabel("Y-axis (field length)")
 
-    # Plot red robots
-    for i, location in enumerate(event['red_locations']):
-        ax.scatter(*location, color="red", label=f"Red Robot {i+1}" if i == 0 else "")
-        ax.text(location[0], location[1], event['red_actions'][i], color="red", fontsize=8)
+    # Plot static elements
+    ax.add_patch(plt.Rectangle((1, 1), 2, 2, color="green", alpha=0.3, label="Coral Area"))
+    ax.add_patch(plt.Rectangle((7, 7), 2, 2, color="blue", alpha=0.3, label="Processor Area"))
+    ax.add_patch(plt.Rectangle((4, 4), 2, 2, color="orange", alpha=0.3, label="Barge"))
 
-    # Plot blue robots
-    for i, location in enumerate(event['blue_locations']):
-        ax.scatter(*location, color="blue", label=f"Blue Robot {i+1}" if i == 0 else "")
-        ax.text(location[0], location[1], event['blue_actions'][i], color="blue", fontsize=8)
+    red_dots, = ax.plot([], [], 'ro', label="Red Robots")
+    blue_dots, = ax.plot([], [], 'bo', label="Blue Robots")
+    red_texts = [ax.text(0, 0, "", color="red", fontsize=8) for _ in range(3)]
+    blue_texts = [ax.text(0, 0, "", color="blue", fontsize=8) for _ in range(3)]
 
+    def init():
+        red_dots.set_data([], [])
+        blue_dots.set_data([], [])
+        for text in red_texts + blue_texts:
+            text.set_text("")
+        return red_dots, blue_dots, *red_texts, *blue_texts
+
+    def update(frame):
+        event = timeline[frame]
+
+        red_x, red_y = zip(*event['red_locations'])
+        blue_x, blue_y = zip(*event['blue_locations'])
+
+        red_dots.set_data(red_x, red_y)
+        blue_dots.set_data(blue_x, blue_y)
+
+        for i, text in enumerate(red_texts):
+            text.set_position(event['red_locations'][i])
+            text.set_text(event['red_actions'][i])
+
+        for i, text in enumerate(blue_texts):
+            text.set_position(event['blue_locations'][i])
+            text.set_text(event['blue_actions'][i])
+
+        return red_dots, blue_dots, *red_texts, *blue_texts
+
+    ani = FuncAnimation(fig, update, frames=len(timeline), init_func=init, blit=True, interval=500)
     ax.legend()
     st.pyplot(fig)
 
 # Streamlit UI
-st.title("REEFSCAPE Second-by-Second Match Simulator")
+st.title("REEFSCAPE Match Animation")
 
 st.sidebar.header("Adjust Probabilities")
 def get_params(alliance_name):
@@ -168,10 +195,8 @@ parameters = {
 
 if st.button("Simulate Match"):
     timeline = simulate_match(parameters)
-    st.subheader("Match Timeline")
+    animate_arena(timeline)
 
+    st.subheader("Match Timeline")
     df = pd.DataFrame(timeline)
     st.write(df)
-
-    second = st.slider("Select Second to Visualize Arena", 1, 150, 1)
-    plot_arena(timeline, second)
