@@ -3,7 +3,6 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import time
 from matplotlib.animation import FuncAnimation
 
 def simulate_match(params):
@@ -137,45 +136,63 @@ def simulate_match(params):
 
     return timeline
 
-def plot_arena_with_subplots(timeline, current_second):
-    """Plots the arena for both alliances as separate subplots."""
-    event = timeline[current_second - 1]
-
+def animate_arena_with_subplots(timeline):
+    """Animates the arena for both alliances with two subplots."""
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    fig.suptitle(f"REEFSCAPE Arena at Second {current_second}")
+    fig.suptitle("REEFSCAPE Arena Animation")
 
-    # Red Alliance plot
-    ax_red = axes[0]
-    ax_red.set_xlim(0, 10)
-    ax_red.set_ylim(0, 10)
-    ax_red.set_title("Red Alliance")
-    ax_red.set_xlabel("X-axis (field width)")
-    ax_red.set_ylabel("Y-axis (field length)")
-    ax_red.add_patch(plt.Rectangle((0, 0), 3, 3, color="green", alpha=0.3, label="Red Coral Area"))
-    ax_red.add_patch(plt.Rectangle((7, 7), 3, 3, color="blue", alpha=0.3, label="Red Processor Area"))
-    ax_red.add_patch(plt.Rectangle((4, 4), 2, 2, color="orange", alpha=0.3, label="Barge"))
-    red_x, red_y = zip(*event['red_locations'])
-    ax_red.scatter(red_x, red_y, color="red", label="Red Robots")
-    for i, (x, y) in enumerate(event['red_locations']):
-        ax_red.text(x, y, event['red_actions'][i], color="red", fontsize=8)
-    ax_red.legend()
+    # Configure axes
+    for ax in axes:
+        ax.set_xlim(0, 10)
+        ax.set_ylim(0, 10)
+        ax.set_xlabel("X-axis (field width)")
+        ax.set_ylabel("Y-axis (field length)")
 
-    # Blue Alliance plot
-    ax_blue = axes[1]
-    ax_blue.set_xlim(0, 10)
-    ax_blue.set_ylim(0, 10)
-    ax_blue.set_title("Blue Alliance")
-    ax_blue.set_xlabel("X-axis (field width)")
-    ax_blue.set_ylabel("Y-axis (field length)")
-    ax_blue.add_patch(plt.Rectangle((7, 0), 3, 3, color="green", alpha=0.3, label="Blue Coral Area"))
-    ax_blue.add_patch(plt.Rectangle((0, 7), 3, 3, color="blue", alpha=0.3, label="Blue Processor Area"))
-    ax_blue.add_patch(plt.Rectangle((4, 4), 2, 2, color="orange", alpha=0.3, label="Barge"))
-    blue_x, blue_y = zip(*event['blue_locations'])
-    ax_blue.scatter(blue_x, blue_y, color="blue", label="Blue Robots")
-    for i, (x, y) in enumerate(event['blue_locations']):
-        ax_blue.text(x, y, event['blue_actions'][i], color="blue", fontsize=8)
-    ax_blue.legend()
+    # Add static areas
+    axes[0].add_patch(plt.Rectangle((0, 0), 3, 3, color="green", alpha=0.3, label="Red Coral Area"))
+    axes[0].add_patch(plt.Rectangle((7, 7), 3, 3, color="blue", alpha=0.3, label="Red Processor Area"))
+    axes[0].add_patch(plt.Rectangle((4, 4), 2, 2, color="orange", alpha=0.3, label="Barge"))
+    axes[0].set_title("Red Alliance")
 
+    axes[1].add_patch(plt.Rectangle((7, 0), 3, 3, color="green", alpha=0.3, label="Blue Coral Area"))
+    axes[1].add_patch(plt.Rectangle((0, 7), 3, 3, color="blue", alpha=0.3, label="Blue Processor Area"))
+    axes[1].add_patch(plt.Rectangle((4, 4), 2, 2, color="orange", alpha=0.3, label="Barge"))
+    axes[1].set_title("Blue Alliance")
+
+    # Initialize robot markers
+    red_dots, = axes[0].plot([], [], 'ro', label="Red Robots")
+    blue_dots, = axes[1].plot([], [], 'bo', label="Blue Robots")
+
+    red_texts = [axes[0].text(0, 0, "", color="red", fontsize=8) for _ in range(3)]
+    blue_texts = [axes[1].text(0, 0, "", color="blue", fontsize=8) for _ in range(3)]
+
+    def init():
+        red_dots.set_data([], [])
+        blue_dots.set_data([], [])
+        for text in red_texts + blue_texts:
+            text.set_text("")
+        return red_dots, blue_dots, *red_texts, *blue_texts
+
+    def update(frame):
+        event = timeline[frame]
+
+        # Update red alliance
+        red_x, red_y = zip(*event['red_locations'])
+        red_dots.set_data(red_x, red_y)
+        for i, text in enumerate(red_texts):
+            text.set_position(event['red_locations'][i])
+            text.set_text(event['red_actions'][i])
+
+        # Update blue alliance
+        blue_x, blue_y = zip(*event['blue_locations'])
+        blue_dots.set_data(blue_x, blue_y)
+        for i, text in enumerate(blue_texts):
+            text.set_position(event['blue_locations'][i])
+            text.set_text(event['blue_actions'][i])
+
+        return red_dots, blue_dots, *red_texts, *blue_texts
+
+    ani = FuncAnimation(fig, update, frames=len(timeline), init_func=init, blit=True, interval=500)
     st.pyplot(fig)
 
 # Streamlit UI
@@ -200,9 +217,7 @@ parameters = {
 
 if st.button("Simulate Match"):
     timeline = simulate_match(parameters)
-
-    current_second = st.slider("Select Second to Visualize Arena", 1, 150, 1)
-    plot_arena_with_subplots(timeline, current_second)
+    animate_arena_with_subplots(timeline)
 
     st.subheader("Match Timeline")
     df = pd.DataFrame(timeline)
