@@ -3,7 +3,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 def simulate_match(params):
     """
@@ -136,8 +136,8 @@ def simulate_match(params):
 
     return timeline
 
-def animate_arena_with_subplots(timeline):
-    """Animates the arena for both alliances with two subplots."""
+def save_arena_animation(timeline, filename="reefscape_animation.gif"):
+    """Saves the arena animation for both alliances with two subplots."""
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     fig.suptitle("REEFSCAPE Arena Animation")
 
@@ -193,7 +193,8 @@ def animate_arena_with_subplots(timeline):
         return red_dots, blue_dots, *red_texts, *blue_texts
 
     ani = FuncAnimation(fig, update, frames=len(timeline), init_func=init, blit=True, interval=500)
-    st.pyplot(fig)
+    ani.save(filename, writer=PillowWriter(fps=2))
+    plt.close(fig)
 
 # Streamlit UI
 st.title("REEFSCAPE Match Simulation")
@@ -217,8 +218,5 @@ parameters = {
 
 if st.button("Simulate Match"):
     timeline = simulate_match(parameters)
-    animate_arena_with_subplots(timeline)
-
-    st.subheader("Match Timeline")
-    df = pd.DataFrame(timeline)
-    st.write(df)
+    save_arena_animation(timeline)
+    st.success("Animation saved as reefscape_animation.gif")
