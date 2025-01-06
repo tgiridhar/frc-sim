@@ -219,4 +219,11 @@ parameters = {
 if st.button("Simulate Match"):
     timeline = simulate_match(parameters)
     save_arena_animation(timeline)
-    st.success("Animation saved as reefscape_animation.gif")
+
+    # Display the animation as a GIF
+    st.image("reefscape_animation.gif", caption="REEFSCAPE Match Animation", use_column_width=True)
+
+    # Display the dataframe
+    st.subheader("Match Timeline")
+    df = pd.DataFrame(timeline)
+    st.write(df)
