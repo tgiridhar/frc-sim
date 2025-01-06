@@ -125,21 +125,23 @@ def simulate_match(params):
     return timeline
 
 def animate_arena(timeline):
-    """Animates the arena showing robot actions, coral, processor, and barge areas over time."""
-    fig, ax = plt.subplots(figsize=(8, 8))
+    """Animates the arena showing both teams actively performing tasks with coral, processor, and barge areas."""
+    fig, ax = plt.subplots(figsize=(12, 8))
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 10)
-    ax.set_title("Arena Animation with Coral, Processor, and Barge")
+    ax.set_title("REEFSCAPE Arena Animation")
     ax.set_xlabel("X-axis (field width)")
     ax.set_ylabel("Y-axis (field length)")
 
-    # Plot static elements
+    # Draw static areas
     ax.add_patch(plt.Rectangle((1, 1), 2, 2, color="green", alpha=0.3, label="Coral Area"))
     ax.add_patch(plt.Rectangle((7, 7), 2, 2, color="blue", alpha=0.3, label="Processor Area"))
     ax.add_patch(plt.Rectangle((4, 4), 2, 2, color="orange", alpha=0.3, label="Barge"))
 
+    # Initialize robot markers
     red_dots, = ax.plot([], [], 'ro', label="Red Robots")
     blue_dots, = ax.plot([], [], 'bo', label="Blue Robots")
+
     red_texts = [ax.text(0, 0, "", color="red", fontsize=8) for _ in range(3)]
     blue_texts = [ax.text(0, 0, "", color="blue", fontsize=8) for _ in range(3)]
 
@@ -153,6 +155,7 @@ def animate_arena(timeline):
     def update(frame):
         event = timeline[frame]
 
+        # Extract positions and actions
         red_x, red_y = zip(*event['red_locations'])
         blue_x, blue_y = zip(*event['blue_locations'])
 
@@ -174,7 +177,7 @@ def animate_arena(timeline):
     st.pyplot(fig)
 
 # Streamlit UI
-st.title("REEFSCAPE Match Animation")
+st.title("REEFSCAPE Match Simulation")
 
 st.sidebar.header("Adjust Probabilities")
 def get_params(alliance_name):
